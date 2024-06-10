@@ -1,0 +1,195 @@
+#!meta
+
+{"kernelInfo":{"defaultKernelName":"csharp","items":[{"aliases":[],"name":"csharp"}]}}
+
+#!markdown
+
+# Store CodeFile Text Into Db
+
+This notebook reads from the sample table and will read and store the text in a related table.
+
+#!csharp
+
+#r "nuget: CsvHelper, *-*"
+
+#!csharp
+
+using System;
+using System.Text.RegularExpressions;
+using CsvHelper;
+using CsvHelper.Configuration;
+
+#!markdown
+
+## Requirements
+
+1. That the `CodeFiles.7z` archive found in [this folder](../Resources/DACOS/CodeFiles/) has been extracted to the same folder
+    - You will need to do this manually as there is not a trustworthy 7zip package for .NET.
+2. That the notebook `1_Migrate_Csv_Data_To_DuckDb.dib` has been successfuly executed.
+    - This notebook is ran below for convenience.
+
+#!csharp
+
+#!import 1_Migrate_Csv_Data_To_DuckDb.dib
+
+#!csharp
+
+private const string PathToDACOSCodeFilesRoot = "../Resources/DACOS/CodeFiles/CodeFiles";
+
+#!markdown
+
+#### Connect to DuckDb file
+
+#!csharp
+
+// Open connection to our duckdb database.
+// This creates a new .duckdb file.
+var duckDbConnection = new DuckDBConnection($"Data Source={PathToDuckDbFile}");
+duckDbConnection.Open();
+
+#!markdown
+
+#### Get a list of all files from the samples table
+
+#!csharp
+
+var command = duckDbConnection.CreateCommand();
+
+#!csharp
+
+// A POCO class for holding our sample record data
+class Sample 
+{
+    public int Id {get; set;}
+    public bool IsClass {get; set;}
+    public string PathToFile {get; set;}
+}
+
+// A POCO class for holding the sample file's text contents
+class SampleCodeReference 
+{
+    public int Id {get; set;}
+    public int SampleId {get; set;}
+    public string ActualPathToFile {get; set;}
+    public string CodeText {get; set;}
+}
+
+#!csharp
+
+command.CommandText = $"SELECT id, is_class, path_to_file from sample;";
+var reader = command.ExecuteReader();
+
+#!csharp
+
+var samples = new List<Sample>();
+
+while (reader.Read())
+{
+    var sample = new Sample() 
+    {
+        Id = reader.GetInt32(0),
+        IsClass = reader.GetBoolean(1),
+        PathToFile = reader.GetString(2)
+    };
+
+    samples.Add(sample);
+}
+
+samples.DisplayTable<Sample>();
+
+#!csharp
+
+var sampleCodeReferences = new List<SampleCodeReference>();
+
+var id = 1;
+foreach (var sample in samples)
+{
+    var sampleCodeReference = new SampleCodeReference()
+    {
+        Id = id,
+        SampleId = sample.Id
+    };
+
+    var dbFullPath = $"{PathToDACOSCodeFilesRoot}{sample.PathToFile}";
+    var dbDirectoryPath = Path.GetDirectoryName(dbFullPath);
+    var dbFileName = dbFullPath.Split('/')[^1];
+
+    var isMacroZheng = dbFullPath.Contains("/macrozheng_mall/macrozheng_mall/");
+    var isBlankjAndroidUtilCode = dbFullPath.Contains("/Blankj_AndroidUtilCode/Blankj_AndroidUtilCode/");
+
+    // There are missing files from the dataset with special flavors of problems per some individual contributors.
+    if (isMacroZheng) 
+    {
+        // *raises fist* MACRO ZHEEEENNNNGGG!!!!
+        var hasUnexpectedOmsFilePrefix = File.Exists($"{dbDirectoryPath}/Oms{dbFileName}");
+        var hasUnexpectedPmsFilePrefix = File.Exists($"{dbDirectoryPath}/Pms{dbFileName}");
+        var hasUnexpectedUmsFilePrefix = File.Exists($"{dbDirectoryPath}/Ums{dbFileName}");
+        var hasUnexpectedEsFilePrefix = File.Exists($"{dbDirectoryPath}/Es{dbFileName}");
+
+        if (hasUnexpectedOmsFilePrefix)
+            sampleCodeReference.ActualPathToFile = $"{dbDirectoryPath}/Oms{dbFileName}";
+        else    
+        if (hasUnexpectedPmsFilePrefix)
+            sampleCodeReference.ActualPathToFile = $"{dbDirectoryPath}/Pms{dbFileName}";
+        else
+        if (hasUnexpectedUmsFilePrefix)
+            sampleCodeReference.ActualPathToFile = $"{dbDirectoryPath}/Ums{dbFileName}";
+        else
+            sampleCodeReference.ActualPathToFile = dbFullPath;
+    } 
+    else
+    {
+        sampleCodeReference.ActualPathToFile = dbFullPath;
+    }
+
+    if (File.Exists(sampleCodeReference.ActualPathToFile))
+    {
+        sampleCodeReference.CodeText = File.ReadAllText(sampleCodeReference.ActualPathToFile);
+        sampleCodeReferences.Add(sampleCodeReference);
+    }  
+}
+
+sampleCodeReferences.DisplayTable<SampleCodeReference>();
+
+#!csharp
+
+using System.Collections.Generic;
+using System.IO;
+using CsvHelper;
+using CsvHelper.Configuration;
+
+public class CsvWriterHelper<T>
+{
+    public void WriteListToCsv(IEnumerable<T> list, string filePath)
+    {
+        var config = new CsvConfiguration(new System.Globalization.CultureInfo("en-US"))
+        {
+            Delimiter = ",",
+        };
+
+        using (var writer = new StreamWriter(filePath))
+        using (var csv = new CsvWriter(writer, config))
+        {
+            csv.WriteRecords(list);
+        }
+    }
+}
+
+#!csharp
+
+var sampleCodeReferencesCsvOutputPath = $"{PathToDacosMainCsvFiles}/sample_code_reference.csv";
+
+var csvWriterHelper = new CsvWriterHelper<SampleCodeReference>();
+
+csvWriterHelper.WriteListToCsv(sampleCodeReferences, sampleCodeReferencesCsvOutputPath);
+
+#!csharp
+
+command = duckDbConnection.CreateCommand();
+
+command.CommandText = $"CREATE OR REPLACE TABLE sample_code_reference as select * from read_csv('{Path.GetFullPath(PathToDacosMainCsvFiles)}\\sample_code_reference.csv',header=true);";
+var executeNonQuery = command.ExecuteNonQuery();
+
+#!csharp
+
+duckDbConnection.Close();

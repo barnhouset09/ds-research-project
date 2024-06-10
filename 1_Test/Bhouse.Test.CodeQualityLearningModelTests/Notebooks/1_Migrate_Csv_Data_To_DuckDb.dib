@@ -1,0 +1,103 @@
+#!meta
+
+{"kernelInfo":{"defaultKernelName":"csharp","items":[{"aliases":[],"name":"csharp"}]}}
+
+#!markdown
+
+# Migrate CSV Data To DuckDB Database
+This notebook allows you to migrate the DACOSMain.sql dataset from exported csv table data to individual tables into a duckdb file.
+
+## Requirements
+- 7Zip
+- You will need to extract the 7zip archive in the [Resources/DACOS/DACOSTableDataAsCsvs/](./../Resources/DACOS/DACOSTableDataAsCsvs/) folder.
+
+#!markdown
+
+#### Install the DuckDB.NET.Data.Full NuGet package
+
+#!csharp
+
+#r "nuget: DuckDB.NET.Data.Full, *-*"
+
+#!markdown
+
+#### Import libraries
+
+#!csharp
+
+using System.IO;
+using System.Runtime;
+using DuckDB.NET.Data;
+
+#!markdown
+
+#### Set paths to files
+
+#!csharp
+
+private const string PathToDuckDbFile = "../Resources/DACOS/DACOSMain.duckdb";
+private static readonly string PathToDacosMainCsvFiles = @"../Resources/DACOS/DACOSTableDataAsCsvs";
+
+#!markdown
+
+#### Ensure DACOSMain.sql tables have been exported to `.csv`
+
+#!csharp
+
+ if (!File.Exists($"{PathToDacosMainCsvFiles}/annotation.csv"))
+    throw new Exception(
+        $"Could not find annotation.csv. You may need to extract the file at {PathToDacosMainCsvFiles}.");
+
+if (!File.Exists($"{PathToDacosMainCsvFiles}/class_metrics.csv"))
+    throw new Exception(
+        $"Could not find annotation.csv. You may need to extract the file at {PathToDacosMainCsvFiles}.");
+
+if (!File.Exists($"{PathToDacosMainCsvFiles}/method_metrics.csv"))
+    throw new Exception(
+        $"Could not find method_metrics.csv. You may need to extract the file at {PathToDacosMainCsvFiles}.");
+
+if (!File.Exists($"{PathToDacosMainCsvFiles}/sample.csv"))
+    throw new Exception(
+        $"Could not find sample.csv. You may need to extract the file at {PathToDacosMainCsvFiles}.");
+
+if (!File.Exists($"{PathToDacosMainCsvFiles}/smell.csv"))
+    throw new Exception(
+        $"Could not find smell.csv. You may need to extract the file at {PathToDacosMainCsvFiles}.");
+
+Console.WriteLine("Csv files found. Ready to attempt creating duckdb file.");
+
+#!csharp
+
+// Open connection to our duckdb database.
+// This creates a new .duckdb file.
+var duckDbConnection = new DuckDBConnection($"Data Source={PathToDuckDbFile}");
+duckDbConnection.Open();
+
+#!csharp
+
+var command = duckDbConnection.CreateCommand();
+
+#!csharp
+
+command.CommandText = $"CREATE OR REPLACE TABLE annotation as select * from read_csv('{Path.GetFullPath(PathToDacosMainCsvFiles)}\\annotation.csv',header=true);";
+var executeNonQuery = command.ExecuteNonQuery();
+
+command.CommandText = $"CREATE OR REPLACE TABLE class_metrics as select * from read_csv('{Path.GetFullPath(PathToDacosMainCsvFiles)}\\class_metrics.csv',header=true);";
+executeNonQuery = command.ExecuteNonQuery();
+
+command.CommandText = $"CREATE OR REPLACE TABLE method_metrics as select * from read_csv('{Path.GetFullPath(PathToDacosMainCsvFiles)}\\method_metrics.csv',header=true);";
+executeNonQuery = command.ExecuteNonQuery();
+
+command.CommandText = $"CREATE OR REPLACE TABLE sample as select * from read_csv('{Path.GetFullPath(PathToDacosMainCsvFiles)}\\sample.csv',header=true);";
+executeNonQuery = command.ExecuteNonQuery();
+
+command.CommandText = $"CREATE OR REPLACE TABLE smell as select * from read_csv('{Path.GetFullPath(PathToDacosMainCsvFiles)}\\smell.csv',header=true);";
+executeNonQuery = command.ExecuteNonQuery();
+
+#!csharp
+
+duckDbConnection.Close();
+
+#!markdown
+
+#### DuckDb database has been created & DACOSMain.sql data has been imported!
