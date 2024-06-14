@@ -3,3 +3,11 @@ obj/
 /packages/
 riderModule.iml
 /_ReSharper.Caches/
+/1_Test/Bhouse.Test.CodeQualityLearningModelTests/Resources/DACOS/CodeFiles/CodeFiles/codesplit_java_class
+/1_Test/Bhouse.Test.CodeQualityLearningModelTests/Resources/DACOS/CodeFiles/CodeFiles/codesplit_java_method
+.vs
+.idea
+/1_Test/Bhouse.Test.CodeQualityLearningModelTests/Resources/**/*.csv
+/1_Test/Bhouse.Test.CodeQualityLearningModelTests/Resources/DACOS/*.duckdb
+/1_Test/Bhouse.Test.CodeQualityLearningModelTests/Resources/DACOS/*.duckdb.wal
+*.DotSettings.user

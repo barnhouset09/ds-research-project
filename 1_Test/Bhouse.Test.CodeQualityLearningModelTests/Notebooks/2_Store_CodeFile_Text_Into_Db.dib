@@ -6,7 +6,42 @@
 
 # Store CodeFile Text Into Db
 
-This notebook reads from the sample table and will read and store the text in a related table.
+This notebook reads the code files collected by the DACOS team and stores the text in a related table.
+
+##### What does that mean?
+The original DACOS dataset is a MySQL database of collected metrics of java files, and a separate file archive of those java files. 
+
+The original MySQL database only maintains a namespace or path reference to the file of the collected metrics for code smells.
+
+This notebook:
+- Leverages the original MySQL database's code paths to retrieve each file, then 
+- Adds the file's contents to another table, with a foreign key relationship to the original path and collected metrics
+
+##### Why do this?
+
+Having all of the data in the same database will allow us to retrieve the related data much quicker, and allow us to more easily build a learning model later.
+
+##### How do we do this?
+
+After we've read all of the original MySQL dataset into our DuckDB database (as shown in [this notebook](./1_Migrate_Csv_Data_To_DuckDb.dib)), we do the following:
+
+1. Extract all of the code files from the DACOS dataset's codefile archive
+2. Query all of the `sample` records from the DuckDB table
+    - This table houses references to each codefile's name and the codesmell metrics collected
+3. Iterate through all of the `sample` records to:
+    - Find the matching extracted code file
+    - Read the file's contents
+    - Insert a record into a new `.csv` file that has two columns:
+        1. a reference to the `sample` record, and
+        2. the full text of the code file's contents
+4. Insert all of the records generated in the new `.csv` file into a new DuckDb table named `sample_code_reference`.
+
+#!markdown
+
+## Import Libraries
+This notebook leverages a nuget package called `CsvHelper`. 
+
+It is a popular library in .NET for reading, building, and otherwise manipulating `.csv` files.
 
 #!csharp
 
@@ -34,6 +69,7 @@ using CsvHelper.Configuration;
 
 #!csharp
 
+// The path to our code file directory.
 private const string PathToDACOSCodeFilesRoot = "../Resources/DACOS/CodeFiles/CodeFiles";
 
 #!markdown
@@ -42,7 +78,7 @@ private const string PathToDACOSCodeFilesRoot = "../Resources/DACOS/CodeFiles/Co
 
 #!csharp
 
-// Open connection to our duckdb database.
+// Open a connection to our duckdb database.
 // This creates a new .duckdb file.
 var duckDbConnection = new DuckDBConnection($"Data Source={PathToDuckDbFile}");
 duckDbConnection.Open();
@@ -74,17 +110,30 @@ class SampleCodeReference
     public string CodeText {get; set;}
 }
 
+#!markdown
+
+### Read all records from the `sample` table
+Get all records of the DACOS dataset's `sample` table by querying DuckDB.
+
 #!csharp
 
+// Define the query.
 command.CommandText = $"SELECT id, is_class, path_to_file from sample;";
+
+// Execute the query
 var reader = command.ExecuteReader();
 
 #!csharp
 
+// Read the query results
+
+// Store them in this samples list
 var samples = new List<Sample>();
 
+// Iterate through the query results
 while (reader.Read())
 {
+    // Create each sample from the data.
     var sample = new Sample() 
     {
         Id = reader.GetInt32(0),
@@ -92,35 +141,66 @@ while (reader.Read())
         PathToFile = reader.GetString(2)
     };
 
+    // Store each sample
     samples.Add(sample);
 }
 
+// (optional) Display the results.
 samples.DisplayTable<Sample>();
+
+#!markdown
+
+### Scan for files
+Now that we have all of the relative filepaths of the original dataset, we:
+
+1. Scan our local filesystem to see if the file exists
+2. If the file exists, create a new `SampleCodeReference` object that contains:
+    - `Id`: it's own new primary key reference
+    - `SampleId`: a foreign key reference to the original `sample` table record we got the filename from
+    - `ActualFilePath`: a string of the full text path to the file on our local filesystem
+    - `CodeText`: a string of the full text content of the code file
+3. Then store the `SampleCodeReference` object into a list in memory
+    - this will be used to create a `.csv` file in a later code block.
+
+#### Codefile Reading Caveats
+
+There were a couple of problems with the dataset upon reading:
+1. Some of the files under the `macrozheng_mall` namespace were named differently from the what was included in the `sample` table data
+    - We account for this specifically so we can still read the files
+2. Some of the files are missing altogether
 
 #!csharp
 
+// Create empty list to add our SampleCodeReference objects to.
 var sampleCodeReferences = new List<SampleCodeReference>();
 
+// Create a primary key we can increment for each object we create.
 var id = 1;
+
+// Loop through the query results from the previous code block.
 foreach (var sample in samples)
 {
+    // Create our new SampleCodeReference object
     var sampleCodeReference = new SampleCodeReference()
     {
         Id = id,
         SampleId = sample.Id
     };
 
+    // Build our filepath from the `sample` record found in our previous code path.
     var dbFullPath = $"{PathToDACOSCodeFilesRoot}{sample.PathToFile}";
     var dbDirectoryPath = Path.GetDirectoryName(dbFullPath);
     var dbFileName = dbFullPath.Split('/')[^1];
 
+    // There was a problem where Macro Zheng's files were named differently than what was
+    // provided from the `sample` table record's path.
+    //
+    // We use this boolean to know when we're scanning his files so we can work around it and scan the intended files.
     var isMacroZheng = dbFullPath.Contains("/macrozheng_mall/macrozheng_mall/");
-    var isBlankjAndroidUtilCode = dbFullPath.Contains("/Blankj_AndroidUtilCode/Blankj_AndroidUtilCode/");
 
-    // There are missing files from the dataset with special flavors of problems per some individual contributors.
+    // Use the boolean to account specifically for the Macro Zheng problem scenarios.
     if (isMacroZheng) 
     {
-        // *raises fist* MACRO ZHEEEENNNNGGG!!!!
         var hasUnexpectedOmsFilePrefix = File.Exists($"{dbDirectoryPath}/Oms{dbFileName}");
         var hasUnexpectedPmsFilePrefix = File.Exists($"{dbDirectoryPath}/Pms{dbFileName}");
         var hasUnexpectedUmsFilePrefix = File.Exists($"{dbDirectoryPath}/Ums{dbFileName}");
@@ -139,17 +219,29 @@ foreach (var sample in samples)
     } 
     else
     {
+        // Otherwise read the file path normally.
         sampleCodeReference.ActualPathToFile = dbFullPath;
     }
 
+    // Check to see if the file at the path exists
     if (File.Exists(sampleCodeReference.ActualPathToFile))
     {
+        // Add the file's text contents to our SampleCodeReference object
         sampleCodeReference.CodeText = File.ReadAllText(sampleCodeReference.ActualPathToFile);
+
+        // Add the SampleCodeReference object to our list in memory.
         sampleCodeReferences.Add(sampleCodeReference);
     }  
 }
 
+// (optional) display the in memory list results.
 sampleCodeReferences.DisplayTable<SampleCodeReference>();
+
+#!markdown
+
+### Define our CsvWriter method/function
+
+This takes in a list of objects (like our `SampleCodeReferences` list) and creates a `.csv` file for us.
 
 #!csharp
 
@@ -175,6 +267,10 @@ public class CsvWriterHelper<T>
     }
 }
 
+#!markdown
+
+Use our method to write the `CodeSampleReference` list data into the `.csv` file.
+
 #!csharp
 
 var sampleCodeReferencesCsvOutputPath = $"{PathToDacosMainCsvFiles}/sample_code_reference.csv";
@@ -183,13 +279,25 @@ var csvWriterHelper = new CsvWriterHelper<SampleCodeReference>();
 
 csvWriterHelper.WriteListToCsv(sampleCodeReferences, sampleCodeReferencesCsvOutputPath);
 
+#!markdown
+
+### Store the `.csv` data into our duckdb instance
+
+DuckDB excels at reading volumes of structured and unstructured data.
+
+We read our `.csv` file we just created and create a new table called `sample_code_reference` to store the data.
+
 #!csharp
 
 command = duckDbConnection.CreateCommand();
 
+// Create our query for creating the table from our csv
 command.CommandText = $"CREATE OR REPLACE TABLE sample_code_reference as select * from read_csv('{Path.GetFullPath(PathToDacosMainCsvFiles)}\\sample_code_reference.csv',header=true);";
+
+// Execute the query to create the table
 var executeNonQuery = command.ExecuteNonQuery();
 
 #!csharp
 
+// Close our duckdb connection
 duckDbConnection.Close();

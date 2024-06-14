@@ -1,0 +1,17 @@
+#!meta
+
+{"kernelInfo":{"defaultKernelName":"csharp","items":[{"aliases":[],"name":"csharp"}]}}
+
+#!markdown
+
+# Perform Data Analysis
+This notebook leverages some of .NET's data analysis libraries to explore the DACOS dataset.
+
+The goals of this exploration are to:
+- Describe the structure of the dataset
+- Visualize the distribution of the data used for training
+- Explain any problems found while processing the data
+
+#!markdown
+
+## Import References

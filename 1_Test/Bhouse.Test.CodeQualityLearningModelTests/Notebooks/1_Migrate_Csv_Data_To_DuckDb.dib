@@ -77,6 +77,10 @@ duckDbConnection.Open();
 
 var command = duckDbConnection.CreateCommand();
 
+#!markdown
+
+### Store the `.csv` data into DuckDb
+
 #!csharp
 
 command.CommandText = $"CREATE OR REPLACE TABLE annotation as select * from read_csv('{Path.GetFullPath(PathToDacosMainCsvFiles)}\\annotation.csv',header=true);";
