@@ -35,8 +35,7 @@ using DuckDB.NET.Data;
 
 #!csharp
 
-private const string PathToDuckDbFile = "../Resources/DACOS/DACOSMain.duckdb";
-private static readonly string PathToDacosMainCsvFiles = @"../Resources/DACOS/DACOSTableDataAsCsvs";
+#!import Configuration/FilePaths.dib
 
 #!markdown
 

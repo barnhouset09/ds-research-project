@@ -15,3 +15,238 @@ The goals of this exploration are to:
 #!markdown
 
 ## Import References
+
+#!markdown
+
+Install NuGet packages
+
+#!csharp
+
+#r "nuget:SandDance.InteractiveExtension,*-*"
+#r "nuget:DataView.InteractiveExtension,*-*"
+#r "nuget:Microsoft.ML.DataView"
+#r "nuget:Microsoft.Data.Analysis"
+#r "nuget: DuckDB.NET.Data.Full, *-*"
+
+#!markdown
+
+Import References
+
+#!csharp
+
+using System.IO;
+using System.Collections.Generic;
+using Microsoft.Data.Analysis;
+using Microsoft.ML;
+using System.Runtime;
+using DuckDB.NET.Data;
+
+#!csharp
+
+#!import Configuration/FilePaths.dib
+
+#!markdown
+
+Connect To Our DuckDB Instance
+
+#!csharp
+
+// Open connection to our duckdb database.
+// This creates a new .duckdb file.
+var duckDbConnection = new DuckDBConnection($"Data Source={PathToDuckDbFile}");
+duckDbConnection.Open();
+
+var command = duckDbConnection.CreateCommand();
+
+#!markdown
+
+Import POCO object definitions for data analysis.
+
+#!csharp
+
+#!import DataModels/MetricsForCollectedDataAnalysis.dib
+
+#!markdown
+
+Read our class metrics data into a dataframe
+
+#!csharp
+
+// Define the query.
+command.CommandText = @$"
+SELECT
+    s.Id                as SampleId, 
+    scr.Id              as SampleCodeReferenceId,
+    s.has_smell         as HasSmell,
+    a.iscm              as HasComplexMethod,
+    a.islp              as HasLongParameterList,
+    a.isma              as HasMultifacetedAbstraction,
+    cm.dit              as DepthOfInheritance,
+    cm.fanin            as FanIn,
+    cm.fanout           as FanOut,
+    cm.lcom             as LackOfCohesionInMethods,
+    cm.loc              as LinesOfCode,
+    cm.nc               as NumberOfClasses,
+    cm.nof              as NumberOfFields,
+    cm.nom              as NumberOfMethods,
+    cm.nopf             as NumberOfPublicFields,
+    cm.nopm             as NumberOfPublicMethods,
+    cm.wmc              as WeightedMethodsPerClass,
+    cm.type_name        as TypeName,
+    'Java'              as ProgrammingLanguage,
+    scr.CodeText        as CodeText
+FROM 
+    sample s 
+        JOIN sample_code_reference scr ON 
+            s.id = scr.SampleId
+        JOIN class_metrics cm ON 
+            s.designite_id = cm.id
+        JOIN annotation a ON
+            a.sample_id = s.id
+WHERE
+    s.is_class = true
+;";
+
+// Execute the query
+var reader = command.ExecuteReader();
+
+#!markdown
+
+Read our query results into a list of ClassMetrics
+
+#!csharp
+
+// Read the query results
+
+// Store them in this samples list
+var classMetrics = new List<ObjectOrientedClassMetrics>();
+
+// Iterate through the query results
+while (reader.Read())
+{
+    // Create each sample from the data.
+    var classMetric = new ObjectOrientedClassMetrics() 
+    {
+        SampleId = reader.GetInt32(0),
+        SampleCodeReferenceId = reader.GetInt32(1),
+        HasSmell = reader.GetBoolean(2),
+        HasComplexMethod = reader.GetBoolean(3),
+        HasLongParameterList = reader.GetBoolean(4),
+        HasMultifacetedAbstraction = reader.GetBoolean(5),
+        DepthOfInheritanceTree = reader.GetInt32(6),
+        FanIn = reader.GetInt32(7),
+        FanOut = reader.GetInt32(8),
+        LackOfCohesionInMethods = reader.GetDouble(9),
+        LinesOfCode = reader.GetInt32(10),
+        NumberOfClasses = reader.GetInt32(11),
+        NumberOfFields = reader.GetInt32(12),
+        NumberOfMethods = reader.GetInt32(13),
+        NumberOfPublicFields = reader.GetInt32(14),
+        NumberOfPublicMethods = reader.GetInt32(15),
+        WeightedMethodsPerClass = reader.GetInt32(16),
+        TypeName = reader.GetString(17),
+        ProgrammingLanguage = reader.GetString(18),
+        CodeText = reader.GetString(19)
+    };
+
+    // Store each sample
+    classMetrics.Add(classMetric);
+}
+
+#!csharp
+
+var properties = typeof(ObjectOrientedClassMetrics).GetProperties(); // Getting all properties of class
+
+foreach (var property in properties)
+{
+    try
+    {
+        var columnName = property.Name;
+        var columnValues = classMetrics.Select(cm => property.GetValue(cm)).ToList();
+        
+        var df = DataFrame.LoadFrom(
+            new List<IList<object>>() { columnValues.Cast<object>().ToList() },
+            new List<(string, Type)>() { (columnName, property.PropertyType) }
+        );
+        
+        Console.WriteLine($"Created DataFrame for '{columnName}' successfully.");
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"Failed to create DataFrame for '{property.Name}'. Exception: {ex.Message}");
+    }
+}
+
+#!markdown
+
+Query for our collected method metrics
+
+#!csharp
+
+// Define the query.
+command.CommandText = @$"
+SELECT
+    s.Id                as SampleId, 
+    scr.Id              as SampleCodeReferenceId,
+    s.has_smell         as HasSmell,
+    a.iscm              as HasComplexMethod,
+    a.islp              as HasLongParameterList,
+    a.isma              as HasMultifacetedAbstraction,
+    mm.cc               as CyclomaticComplexity,
+    mm.loc              as LinesOfCode,
+    mm.pc               as PathCount,
+    mm.type_name        as TypeName,
+    'Java'              as ProgrammingLanguage,
+    scr.CodeText        as CodeText
+FROM 
+    sample s 
+        JOIN sample_code_reference scr ON 
+            s.id = scr.SampleId
+        JOIN method_metrics mm ON 
+            s.designite_id = mm.id
+        JOIN annotation a ON
+            a.sample_id = s.id
+WHERE
+    s.is_class = false
+;";
+
+// Execute the query
+reader = command.ExecuteReader();
+
+#!markdown
+
+Read our query results into a list of method metrics
+
+#!csharp
+
+// Read the query results
+
+// Store them in this samples list
+var methodMetrics = new List<ObjectOrientedMethodMetrics>();
+
+// Iterate through the query results
+while (reader.Read())
+{
+    // Create each sample from the data.
+    var methodMetric = new ObjectOrientedMethodMetrics() 
+    {
+        SampleId = reader.GetInt32(0),
+        SampleCodeReferenceId = reader.GetInt32(1),
+        HasSmell = reader.GetBoolean(2),
+        HasComplexMethod = reader.GetBoolean(3),
+        HasLongParameterList = reader.GetBoolean(4),
+        HasMultifacetedAbstraction = reader.GetBoolean(5),
+        CyclomaticComplexity = reader.GetInt32(6),
+        LinesOfCode = reader.GetInt32(7),
+        PathCount = reader.GetInt32(8),
+        TypeName = reader.GetString(9),
+        ProgrammingLanguage = reader.GetString(10),
+        CodeText = reader.GetString(11)
+    };
+
+    // Store each sample
+    methodMetrics.Add(methodMetric);
+}
+
+// (optional) Display the results.
+methodMetrics.DisplayTable<ObjectOrientedMethodMetrics>();

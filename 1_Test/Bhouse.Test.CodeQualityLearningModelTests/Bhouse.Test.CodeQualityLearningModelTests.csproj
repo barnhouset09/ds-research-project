@@ -26,7 +26,7 @@
     </ItemGroup>
 
     <ItemGroup>
-      <Folder Include="LearningModels\" />
+      <Folder Include="Models\Learning\" />
       <Folder Include="Resources\DACOS\CodeFiles\" />
     </ItemGroup>
 
