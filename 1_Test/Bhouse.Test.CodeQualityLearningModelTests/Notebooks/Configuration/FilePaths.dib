@@ -18,3 +18,13 @@ private static readonly string PathToDacosMainCsvFiles = @"../Resources/DACOS/DA
 /// The path to the DACOS code files we extracted.
 /// </summary>
 private const string PathToDACOSCodeFilesRoot = "../Resources/DACOS/CodeFiles/CodeFiles";
+
+/// <summary>
+/// The path to the ClassMetrics.csv file.
+/// </summary>
+private const string PathToClassMetricsFile = "DataSets/class_metrics.csv";
+
+/// <summary>
+/// The path to the MethodMetrics.csv file.
+/// </summary>
+private const string PathToMethodMetricsFile = "DataSets/method_metrics.csv";

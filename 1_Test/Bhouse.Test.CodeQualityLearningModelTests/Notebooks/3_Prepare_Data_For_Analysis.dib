@@ -1,0 +1,188 @@
+#!meta
+
+{"kernelInfo":{"defaultKernelName":"csharp","items":[{"aliases":[],"name":"csharp"}]}}
+
+#!markdown
+
+# Perform Data Analysis
+This notebook leverages some of .NET's data analysis libraries to explore the DACOS dataset.
+
+The goals of this exploration are to:
+- Describe the structure of the dataset
+- Visualize the distribution of the data used for training
+- Explain any problems found while processing the data
+
+#!markdown
+
+## Import References
+
+#!markdown
+
+Install NuGet packages
+
+#!csharp
+
+#r "nuget:SandDance.InteractiveExtension,*-*"
+#r "nuget:DataView.InteractiveExtension,*-*"
+#r "nuget:Microsoft.ML.DataView"
+#r "nuget:Microsoft.Data.Analysis"
+#r "nuget: DuckDB.NET.Data.Full, *-*"
+
+#!markdown
+
+Import References
+
+#!csharp
+
+using System.IO;
+using System.Collections.Generic;
+using Microsoft.Data.Analysis;
+using Microsoft.ML;
+using System.Runtime;
+using DuckDB.NET.Data;
+
+#!csharp
+
+#!import Configuration/FilePaths.dib
+
+#!markdown
+
+Connect To Our DuckDB Instance
+
+#!csharp
+
+// Open connection to our duckdb database.
+// This creates a new .duckdb file.
+var duckDbConnection = new DuckDBConnection($"Data Source={PathToDuckDbFile}");
+duckDbConnection.Open();
+
+var command = duckDbConnection.CreateCommand();
+
+#!markdown
+
+Read our class metrics data from the database and copy them into a csv file
+
+#!csharp
+
+// Define the query.
+command.CommandText = @$"
+COPY (
+    SELECT
+        s.Id                as SampleId, 
+        scr.Id              as SampleCodeReferenceId,
+        s.has_smell         as HasSmell,
+        a.iscm              as HasComplexMethod,
+        a.islp              as HasLongParameterList,
+        a.isma              as HasMultifacetedAbstraction,
+        cm.dit              as DepthOfInheritance,
+        cm.fanin            as FanIn,
+        cm.fanout           as FanOut,
+        cm.lcom             as LackOfCohesionInMethods,
+        cm.loc              as LinesOfCode,
+        cm.nc               as NumberOfClasses,
+        cm.nof              as NumberOfFields,
+        cm.nom              as NumberOfMethods,
+        cm.nopf             as NumberOfPublicFields,
+        cm.nopm             as NumberOfPublicMethods,
+        cm.wmc              as WeightedMethodsPerClass,
+        cm.type_name        as TypeName,
+        'Java'              as ProgrammingLanguage,
+        scr.CodeText        as CodeText
+    FROM 
+        sample s 
+            JOIN sample_code_reference scr ON 
+                s.id = scr.SampleId
+            JOIN class_metrics cm ON 
+                s.designite_id = cm.id
+            LEFT JOIN annotation a ON
+                a.sample_id = s.id
+    WHERE
+        s.is_class = true
+)
+TO
+    '{PathToClassMetricsFile}'
+    (
+        HEADER,
+        DELIMITER ','
+    )
+;";
+
+// Execute the query
+var reader = command.ExecuteReader();
+
+#!markdown
+
+Query for our collected method metrics and copy them to a csv file
+
+#!csharp
+
+// Define the query.
+command.CommandText = @$"
+COPY (
+    SELECT
+        s.Id                as SampleId, 
+        scr.Id              as SampleCodeReferenceId,
+        s.has_smell         as HasSmell,
+        a.iscm              as HasComplexMethod,
+        a.islp              as HasLongParameterList,
+        a.isma              as HasMultifacetedAbstraction,
+        mm.cc               as CyclomaticComplexity,
+        mm.loc              as LinesOfCode,
+        mm.pc               as PathCount,
+        mm.type_name        as TypeName,
+        'Java'              as ProgrammingLanguage,
+        scr.CodeText        as CodeText
+    FROM 
+        sample s 
+            JOIN sample_code_reference scr ON 
+                s.id = scr.SampleId
+            JOIN method_metrics mm ON 
+                s.designite_id = mm.id
+            LEFT JOIN annotation a ON
+                a.sample_id = s.id
+    WHERE
+        s.is_class = false
+)
+TO
+    '{PathToMethodMetricsFile}'
+    (
+        HEADER,
+        DELIMITER ','
+    )
+;";
+
+// Execute the query
+reader = command.ExecuteReader();
+
+#!markdown
+
+Load our results into a dataframe for viewing
+
+#!csharp
+
+var classMetricsDf = DataFrame.LoadCsv(PathToClassMetricsFile);
+var methodMetricsDf = DataFrame.LoadCsv(PathToMethodMetricsFile);
+
+#!markdown
+
+#### Class Metrics Overview
+
+#!csharp
+
+classMetricsDf.Info().Display();
+
+#!csharp
+
+classMetricsDf.Description().Display()
+
+#!markdown
+
+#### Method Metrics Overview
+
+#!csharp
+
+methodMetricsDf.Info().Display();
+
+#!csharp
+
+methodMetricsDf.Description().Display();
