@@ -11,3 +11,4 @@ riderModule.iml
 /1_Test/Bhouse.Test.CodeQualityLearningModelTests/Resources/DACOS/*.duckdb
 /1_Test/Bhouse.Test.CodeQualityLearningModelTests/Resources/DACOS/*.duckdb.wal
 *.DotSettings.user
+**.csv
