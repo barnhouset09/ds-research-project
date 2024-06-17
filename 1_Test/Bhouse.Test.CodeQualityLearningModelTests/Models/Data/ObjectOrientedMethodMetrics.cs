@@ -17,22 +17,22 @@ public class ObjectOrientedMethodMetrics
     public int SampleCodeReferenceId {get; set;}
 
     /// <summary>
-    /// Flag representing of the method has a codesmell or not.
+    /// Flag representing of the method has a code-smell or not.
     /// </summary>
     public bool HasSmell {get; set;}
 
     /// <summary>
-    /// Flag representing of the method has the 'Complex Methods' codesmell or not.
+    /// Flag representing of the method has the 'Complex Methods' code-smell or not.
     /// </summary>
     public bool HasComplexMethod {get; set;}
 
     /// <summary>
-    /// Flag representing of the method has the 'Long Parameter List' codesmell or not.
+    /// Flag representing of the method has the 'Long Parameter List' code-smell or not.
     /// </summary>
     public bool HasLongParameterList {get; set;}
 
     /// <summary>
-    /// Flag representing of the method has the 'Multi-Faceted Abstraction' codesmell or not.
+    /// Flag representing of the method has the 'Multi-Faceted Abstraction' code-smell or not.
     /// </summary>
     public bool HasMultifacetedAbstraction {get; set;}
 
@@ -67,5 +67,5 @@ public class ObjectOrientedMethodMetrics
     /// <summary>
     /// The actual text content of the code being analyzed.
     /// </summary>
-    public string CodeText {get; set;}
+    public string CodeText { get; set; } = string.Empty;
 }

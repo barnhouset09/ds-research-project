@@ -114,5 +114,5 @@ public class ObjectOrientedClassMetrics
     /// <summary>
     /// The actual text content of the code being analyzed.
     /// </summary>
-    public string CodeText {get; set;}
+    public string CodeText { get; set; } = string.Empty;
 }

@@ -11,10 +11,15 @@ The files of this dataset have been archived in the following folders of this re
   - The DACOS project requires a MySQL database to create the metadata collected from the Code Files.
   - It can be created on a MySQL server of your choosing using the `DACOSMain.sql` file
   - Instructions for doing so can be found in [this README](MysqlDbScripts/README.md)
-  - **I HAVE MIGRATED THIS DATE TO A DUCKDB INSTANCE TO REDUCE OVERHEAD**
-    - Instructions on how to do so found in [this C# interactive notebook](../../Notebooks/Migrate_Csv_Data_To_DuckDb.dib).
+  - **I HAVE MIGRATED THIS DATA TO A DUCKDB INSTANCE TO REDUCE OVERHEAD**
+    - Instructions on how to do so found in [this C# interactive notebook](../../Notebooks/1_Migrate_Csv_Data_To_DuckDb.dib).
+    - **NOTE:** A compressed archive of the duckdb instance is provided in this repo [here](./DACOS_DuckDb.7z).
+      - e.g. you will not need MySql to access the data, but if you want to reproduce the research you will.
+    - **ADDITIONAL NOTE:** All data interacted with for this project has a relevant 7zip archive. 7zip provides much better compression over other compression suites.
+      - In all cases of data retrieval and cleanup steps, you may unzip the archives available instead.
+      - The notebooks found in [this folder](./../../Notebooks) will make mention of these files' locations should you decide to leverage them instead of repeating the data processing portions of this research.
 
-The creation and other research information about the dataset can be found from this publication:
+The creation and other research information about the DACOS dataset can be found from this publication:
 - https://arxiv.org/pdf/2303.08729
 - A local version is saved in [this pdf](dacos_publication_nandani_saad_sharma.pdf)
 

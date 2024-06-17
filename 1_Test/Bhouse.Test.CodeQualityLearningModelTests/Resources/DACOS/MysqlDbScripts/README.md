@@ -39,7 +39,7 @@
 
    ![Datagrip Mysql Connection Config Window](../MarkdownImages/datagrip_mysql_docker_connection_window.png)
 
-6. Run the `./Resources/MysqlDbScripts/DACOSMain.sql` script:
+6. Run the `./Resources/DACOS/MysqlDbScripts/DACOSMain.sql` script:
    **NOTE:** *This 7zip archive can be found in this README's directory.*
 
    Right-click your MySql connection and go to `Sql Scripts` -> `Run SQL Script...`
@@ -81,4 +81,4 @@ This gave me these five files:
 which have been stored in a single `.7z` compressed archive found in `./Resources/DACOS/DACOSTableDataAsCsvs/DACOSMainAsCsvs.7z` ([link](../DACOSTableDataAsCsvs)).
 
 I have also opted to migrate these files into their own table into a DuckDB instance.
-- See [this notebook](../../../Notebooks/Migrate_Csv_Data_To_DuckDb.dib) for instructions on how to do it
+- See [this notebook](../../../Notebooks/1_Migrate_Csv_Data_To_DuckDb.dib) for instructions on how to do it
