@@ -186,3 +186,7 @@ methodMetricsDf.Info().Display();
 #!csharp
 
 methodMetricsDf.Description().Display();
+
+#!csharp
+
+duckDbConnection.Close();
