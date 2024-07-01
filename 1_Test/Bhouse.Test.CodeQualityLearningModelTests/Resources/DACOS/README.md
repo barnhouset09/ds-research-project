@@ -25,7 +25,7 @@ The creation and other research information about the DACOS dataset can be found
 
 ## Dataset Contents
 
-### `annotations`
+### Table: `annotations`
 **Metadata of each labeled code file. Includes columns:**
 - `Id`
   - Primary key, int
@@ -49,7 +49,7 @@ The creation and other research information about the DACOS dataset can be found
   - int
   - foreign key to the sample table, which contains a reference data to the file being assessed
 
-### `class_metrics`
+### Table: `class_metrics`
 **Metrics collected of each code file and its contained classes**
 - `id`
   - int, primary key
@@ -96,7 +96,7 @@ The creation and other research information about the DACOS dataset can be found
   - string
   - the type / class name
 
-### `method_metrics`
+### Table: `method_metrics`
 **Metrics collected of each method in each code file**
 - `id`
   - int, primary key
@@ -122,7 +122,7 @@ The creation and other research information about the DACOS dataset can be found
   - string
   - the type of object/class that the method returns
 
-### `sample`
+### Table: `sample`
 **A reference to the files that are used in the dataset**
 - `id`
   - int, primary key
@@ -145,10 +145,29 @@ The creation and other research information about the DACOS dataset can be found
   - the name of the project the sample comes from
 - `sample_constraints`
   - int
-  - I am unsure what this value represents.
+  - I am unsure what this value represents
   - I've checked the publication and DACOS dataset pages
   - I've also checked to see if it is part of the designite software
   - Most of the values are less than 10, only 9 records exists above this out of 100k
 
-### `smell`
+### Table: `smell`
 **Appears to be an unused table. Neither the DACOSMain.sql nor the DACOSExtended.sql have any data in this table.**
+
+## Custom Additions to the DataSet
+
+Over the course of this project, there was a need to create a reference table that joined the methods and classes together to the code files they came from.
+
+It was also needed to include class metrics within the method metrics model for analysis and training purposes.
+
+Below are the tables that were added to accomplish this.
+
+### Table: `sample_code_reference`
+**A table containing the validated code path to the actual code file and a foreign key to the `sample` table.**
+- `Id`
+  - int, primary key
+- `SampleId`
+  - int, foreign key to Sample table
+- `ActualPathToFile`
+  - varchar, path to the file on the local file system
+- `CodeText`
+  - The text of the actual file the code and method metrics were collected for.

@@ -28,3 +28,8 @@ private const string PathToClassMetricsFile = "DataSets/class_metrics.csv";
 /// The path to the MethodMetrics.csv file.
 /// </summary>
 private const string PathToMethodMetricsFile = "DataSets/method_metrics.csv";
+
+/// <summary>
+/// The path to the TrainedModel.zip file.
+/// </summary>
+private const string PathToTrainedModelFile = "TrainedModels/TrainedModel.zip";
