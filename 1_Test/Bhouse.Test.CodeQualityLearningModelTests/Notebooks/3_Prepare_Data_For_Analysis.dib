@@ -68,8 +68,7 @@ Read our class metrics data from the database and copy them into a csv file
 command.CommandText = @$"
 COPY (
     SELECT
-        s.Id                as SampleId, 
-        scr.Id              as SampleCodeReferenceId,
+        s.Id                as SampleId,
         s.has_smell         as HasSmell,
         a.iscm              as HasComplexMethod,
         a.islp              as HasLongParameterList,
@@ -85,15 +84,14 @@ COPY (
         cm.nopf             as NumberOfPublicFields,
         cm.nopm             as NumberOfPublicMethods,
         cm.wmc              as WeightedMethodsPerClass,
+        cm.project_name     as ProjectName,
+        cm.package_name     as PackageName,
         cm.type_name        as TypeName,
-        'Java'              as ProgrammingLanguage,
-        scr.CodeText        as CodeText
+        'Java'              as ProgrammingLanguage
     FROM 
-        sample s 
-            JOIN sample_code_reference scr ON 
-                s.id = scr.SampleId
-            JOIN class_metrics cm ON 
-                s.designite_id = cm.id
+        class_metrics cm
+            JOIN sample s ON 
+                cm.id = s.designite_id
             LEFT JOIN annotation a ON
                 a.sample_id = s.id
     WHERE
@@ -120,8 +118,7 @@ Query for our collected method metrics and copy them to a csv file
 command.CommandText = @$"
 COPY (
     SELECT
-        s.Id                as SampleId, 
-        scr.Id              as SampleCodeReferenceId,
+        s.Id                as SampleId,
         s.has_smell         as HasSmell,
         a.iscm              as HasComplexMethod,
         a.islp              as HasLongParameterList,
@@ -129,15 +126,15 @@ COPY (
         mm.cc               as CyclomaticComplexity,
         mm.loc              as LinesOfCode,
         mm.pc               as PathCount,
+        mm.project_name     as ProjectName,
+        mm.package_name     as PackageName,
         mm.type_name        as TypeName,
-        'Java'              as ProgrammingLanguage,
-        scr.CodeText        as CodeText
+        mm.method_name      as MethodName,
+        'Java'              as ProgrammingLanguage
     FROM 
-        sample s 
-            JOIN sample_code_reference scr ON 
-                s.id = scr.SampleId
-            JOIN method_metrics mm ON 
-                s.designite_id = mm.id
+        method_metrics mm
+            JOIN sample s ON 
+                mm.id = s.designite_id
             LEFT JOIN annotation a ON
                 a.sample_id = s.id
     WHERE
@@ -169,6 +166,25 @@ var methodMetricsDf = DataFrame.LoadCsv(PathToMethodMetricsFile);
 
 #!csharp
 
+int trueCount = 0;
+int falseCount = 0;
+
+// Get the specific column
+PrimitiveDataFrameColumn<bool> hasSmellColumn = classMetricsDf.Columns["HasSmell"] as PrimitiveDataFrameColumn<bool>;
+
+// Getting the count of true and false values
+DataFrame valueCounts = hasSmellColumn.ValueCounts();
+
+// Because ValueCounts method returns a DataFrame with counts,
+// we can access the counts for true and false as follows:
+// Count the number of true and false using LINQ
+var trueClassHasSmellCount = hasSmellColumn.Count(value => value == true);
+var falseClassHasSmellCount = hasSmellColumn.Count(value => value == false);
+
+Console.WriteLine($"Classes with smells count: {trueClassHasSmellCount}, Classes without smells values: {falseClassHasSmellCount}");
+
+#!csharp
+
 classMetricsDf.Info().Display();
 
 #!csharp
@@ -178,6 +194,22 @@ classMetricsDf.Description().Display()
 #!markdown
 
 #### Method Metrics Overview
+
+#!csharp
+
+// Get the specific column
+PrimitiveDataFrameColumn<bool> hasSmellColumn = methodMetricsDf.Columns["HasSmell"] as PrimitiveDataFrameColumn<bool>;
+
+// Getting the count of true and false values
+DataFrame valueCounts = hasSmellColumn.ValueCounts();
+
+// Because ValueCounts method returns a DataFrame with counts,
+// we can access the counts for true and false as follows:
+// Count the number of true and false using LINQ
+var trueMethodHasSmellCount = hasSmellColumn.Count(value => value == true);
+var falseMethodHasSmellCount = hasSmellColumn.Count(value => value == false);
+
+Console.WriteLine($"Methods with smells count: {trueMethodHasSmellCount}, Methods without smells values: {falseMethodHasSmellCount}");
 
 #!csharp
 

@@ -18,7 +18,7 @@ Install Nuget Packages
 
 #!markdown
 
-Import References
+### Import References
 
 #!csharp
 
@@ -30,7 +30,7 @@ using Microsoft.ML.Data;
 
 #!markdown
 
-Import Our Filepaths For This Project
+### Import Our Filepaths For This Project
 
 #!csharp
 
@@ -38,84 +38,132 @@ Import Our Filepaths For This Project
 
 #!markdown
 
-Infer Our Columnar Data
+### Infer Our Columnar Data
+AutoML offers a method to `InferColumns`, which will automatically create the inference for us based on the data in the file.
+
+We assign the `labelColumnName` to "HasSmell" as that is the column we'd like to predict.
 
 #!csharp
 
 // Initialize MLContext
-MLContext ctx = new MLContext();
+MLContext mlContext = new MLContext();
 
 // Define data path
 var dataPath = Path.GetFullPath(PathToClassMetricsFile);
 
 // Infer column information
 ColumnInferenceResults columnInference =
-    ctx.Auto().InferColumns(dataPath, labelColumnName: "HasSmell", groupColumns: false);
+    mlContext.Auto().InferColumns(dataPath, labelColumnName: "HasSmell", groupColumns: false);
 
 #!markdown
 
-Load Our Inferred Data
+#### Load Our Inferred Data
 
 #!csharp
 
 // Create text loader
-TextLoader loader = ctx.Data.CreateTextLoader(columnInference.TextLoaderOptions);
+TextLoader loader = mlContext.Data.CreateTextLoader(columnInference.TextLoaderOptions);
 
 // Load data into IDataView
 IDataView data = loader.Load(dataPath);
 
 #!markdown
 
-Train Against A Fraction Of Our Data
+#### Apply necessary transformations to our data
+We need to change the data type of the label we're predicting from `boolean` to `Single`, as it is the type that ML.NET's BinaryClassifier algorithm requires.
 
 #!csharp
 
-DataOperationsCatalog.TrainTestData trainValidationData = ctx.Data.TrainTestSplit(data, testFraction: 0.2);
+// Perform your column type conversion first.
+var convertedData = 
+    mlContext
+        .Transforms
+        .Conversion
+        .ConvertType("HasSmell", "HasSmell", DataKind.Single)
+        .Fit(data)
+        .Transform(data);
 
 #!markdown
 
-Define Our Pipeline
+#### Train Against A Fraction Of Our Data
+We split our data where we train against 80% and test against 20% of it.
+
+#!csharp
+
+DataOperationsCatalog.TrainTestData trainValidationData = mlContext.Data.TrainTestSplit(data, testFraction: 0.2);
+
+#!markdown
+
+#### Define Our Pipeline
+This defines our AutoML pipeline - which automatically provides all available ML techniques and configures those that are applicable to the training data and its column information.
+
+Some explanation of each line of code:
+
+1. `Featurizer(convertedData, columnInformation: columnInference.ColumnInformation)` 
+   - This method applies automatic feature engineering on data provided as IDataView.
+2. `Append(ctx.Auto().BinaryClassification(labelColumnName: columnInference.ColumnInformation.LabelColumnName))`
+   - This is appending a binary classification task to the pipeline, which is a common machine learning task to distinguish between two classes, commonly referred as positive and negative classes.
+   - This is perfect for the prediction we want to make: does code have a smell or not - yes or no?
+3. `labelColumnName: columnInference.ColumnInformation.LabelColumnName`
+   - This is specifying the column that is the label in the data, i.e., the column that we want to predict
 
 #!csharp
 
 SweepablePipeline pipeline =
-    ctx.Auto().Featurizer(data, columnInformation: columnInference.ColumnInformation)
-        .Append(ctx.Auto().BinaryClassification(labelColumnName: columnInference.ColumnInformation.LabelColumnName));
+    mlContext
+        .Auto()
+        .Featurizer(data, columnInformation: columnInference.ColumnInformation)
+        .Append(mlContext.Auto().BinaryClassification(labelColumnName: columnInference.ColumnInformation.LabelColumnName));
 
 #!markdown
 
 ## Configuring Our ML Experiment
 
-This is where we use AutoAI on our model to determine the best algorithm available to train with.
+This is where we use AutoML on our model to determine the best algorithm available to train with.
+
+This could be considered "Hyper-Parameterization", where we are trying out many different inputs to our ML algorithms to try to find what works best.
 
 #!markdown
 
-Create the experiment.
+#### Create the experiment.
 
 #!csharp
 
-AutoMLExperiment experiment = ctx.Auto().CreateExperiment();
+AutoMLExperiment experiment = mlContext.Auto().CreateExperiment();
 
 #!markdown
 
-Configure the experiment
+#### Configure the experiment
+We configure our experiment to do the following:
+- `SetPipeline(pipeline)`
+    - Tells our experiment to use the ML pipeline we configured in previous steps.
+- `SetBinaryClassificationMetric(BinaryClassificationMetric.Accuracy, columnInference.ColumnInformation.LabelColumnName)`
+    - Tells our experiment to target a BinaryClassification where we want to optimize for the best Accuracy we can find for the `HasSmell` column.
+- `SetTrainingTimeInSeconds(20)`
+    - Tells our experiment to run for 20 seconds.
+    - The longer we run, the more experiments we'll run- providing higher likelihood of finding parameters that provide the best prediction accuracy.
+- `SetDataset(trainValidationData)`
+    - Tells our experiment to use the training data we partitioned.
 
 #!csharp
 
 experiment
     .SetPipeline(pipeline)
     .SetBinaryClassificationMetric(BinaryClassificationMetric.Accuracy, columnInference.ColumnInformation.LabelColumnName)
-    .SetTrainingTimeInSeconds(60)
+    .SetTrainingTimeInSeconds(20)
     .SetDataset(trainValidationData);
 
 #!markdown
 
-Add a destination for the trainer's logs to output to.
+#### Add a destination for the trainer's logs to output to.
+This is so we can see what the experiment is doing.
+
+We should see it trying out or experimenting with many variations of parameters for finding what combinations lead to higher accuracy.
 
 #!csharp
 
 // Log experiment trials
-ctx.Log += (_, e) => {
+mlContext.Log += (_, e) => {
     if (e.Source.Equals("AutoMLExperiment"))
     {
         Console.WriteLine(e.RawMessage);
@@ -124,7 +172,7 @@ ctx.Log += (_, e) => {
 
 #!markdown
 
-Run the experiment
+#### Run the experiment
 
 #!csharp
 
@@ -132,11 +180,14 @@ TrialResult experimentResults = await experiment.RunAsync();
 
 #!markdown
 
-Save Trained Model
+#### Save Trained Model
+This allows us to access the MLModel the experiment built.
+
+This way we don't have to run the experiment again to find and use our model.
 
 #!csharp
 
-ctx.Model.Save(experimentResults.Model, loader, PathToTrainedModelFile);
+mlContext.Model.Save(experimentResults.Model, loader, PathToTrainedModelFile);
 
 #!markdown
 
@@ -144,12 +195,12 @@ ctx.Model.Save(experimentResults.Model, loader, PathToTrainedModelFile);
 
 #!csharp
 
-MLContext mlContext = new MLContext();
+MLContext mlContextForTesting = new MLContext();
 
 // Load the trained model
 DataViewSchema predictionPipelineSchema;
 
-ITransformer predictionPipeline = mlContext.Model.Load(PathToTrainedModelFile, out predictionPipelineSchema);
+ITransformer predictionPipeline = mlContextForTesting.Model.Load(PathToTrainedModelFile, out predictionPipelineSchema);
 
 #!csharp
 
@@ -157,7 +208,17 @@ IDataView predictions = predictionPipeline.Transform(trainValidationData.TestSet
 
 #!csharp
 
-// Define StochasticDualCoordinateAscent algorithm estimator
-IEstimator<ITransformer> sdcaEstimator = mlContext.Regression.Trainers.Sdca();
+sdcaEstimator.Display()
 
-var crossValidationResults = mlContext.BinaryClassification.CrossValidate(predictions, sdcaEstimator, numberOfFolds: 5);
+#!csharp
+
+// Define your pipeline
+var pipeline = mlContextForTesting.Append(mlContext.Regression.Trainers.Sdca(labelColumnName: "HasSmell"));
+
+var crossValidationResults = 
+    mlContext.BinaryClassification
+        .CrossValidate(predictions, pipeline, numberOfFolds: 10, labelColumnName: "HasSmell");
+
+#!csharp
+
+crossValidationResults.Display()
