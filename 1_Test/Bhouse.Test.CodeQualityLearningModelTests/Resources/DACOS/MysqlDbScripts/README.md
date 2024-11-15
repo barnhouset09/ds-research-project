@@ -44,7 +44,7 @@
 
    Right-click your MySql connection and go to `Sql Scripts` -> `Run SQL Script...`
 
-   ![Datagrip Mysql Run Script Context Menu Option](../MarkdownImages/datagrip_mysql_docker_connection_window.png)
+   ![Datagrip Mysql Run Script Context Menu Option](../MarkdownImages/datagrip_mysql_docker_run_sql_script_context_menu.png)
 
    Choose the file, and it will create the database with your data.
 

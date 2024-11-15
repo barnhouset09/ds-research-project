@@ -1,0 +1,174 @@
+---
+title: "DACOS_MLR2_Predictions"
+author: "Tom Barnhouse"
+date: "2024-10-1"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+### Install Packages
+
+```{r}
+if (!require(mlr3)) install.packages("mlr3")
+if (!require(mlr3learners)) install.packages("mlr3learners")
+if (!require(data.table)) install.packages("data.table")
+if (!require(mlr3verse)) install.packages("mlr3verse")
+if (!require(ranger)) install.packages("ranger")
+```
+
+### Reference Packages
+
+```{r}
+library(mlr3)
+library(mlr3learners)
+library(data.table)
+library(mlr3verse)
+library(ranger)
+```
+
+### Read our data
+
+```{r}
+data <- fread("DataSets/class_metrics.csv")
+
+# convert the column we want to predict into a factor
+data[, HasSmell := as.factor(HasSmell)]
+
+# remove character-type columns from the dataset
+# they are not supported by our learner
+
+# remove the SampleId
+# it's not an important measure for code smell detection
+data <- data[, !c("SampleId", names(data)[sapply(data, is.character)]), with = FALSE]
+```
+
+### Verify data has been read
+
+```{r}
+head(data)
+```
+
+### Define our ML task
+
+```{r}
+task <- TaskClassif$new(id = "code_smells", backend = data, target = "HasSmell")
+```
+
+### Select our learner
+
+```{r}
+learner <- lrn("classif.rpart")  # Decision Tree
+# Alternatively, we can choose another learner like random forest
+#learner_rf <- lrn("classif.ranger")  # Random Forest
+
+# NOTE: Our dataset has missing values, which Random Forest does not support.
+```
+
+### Split the data
+
+```{r}
+# Split the data
+set.seed(42)  # For reproducibility
+train_set <- sample(task$row_ids, 0.8 * task$nrow)
+test_set <- setdiff(task$row_ids, train_set)
+```
+
+### Train the model
+
+```{r}
+# Train the model
+learner$train(task, row_ids = train_set)
+
+#learner_rf$train(task, row_ids = train_set)
+```
+
+### Evaluate the model
+
+```{r}
+prediction <- learner$predict(task, row_ids = test_set)
+performance <- prediction$score(msr("classif.acc"))
+print(performance)
+```
+
+### Print the confusion matrix
+
+```{r}
+prediction$confusion
+```
+
+### Summarize the results
+
+Each row of the matrix represents the instances in a predicted class, while each column represents the instances in an actual class. Breaking down the confusion matrix, we see:
+
+-   True Negatives (TN): 2013
+
+    -   These are cases where the actual value was FALSE and the model also predicted FALSE.
+
+-   False Positives (FP): 26
+
+    -   These are cases where the actual value was TRUE, but the model incorrectly predicted FALSE.
+
+-   False Negatives (FN): 0
+
+    -   These are cases where the actual value was FALSE, but the model incorrectly predicted TRUE.
+
+-   True Positives (TP): 518 These are cases where the actual value was TRUE and the model also predicted TRUE.
+
+#### Evaluation Metrics
+
+-   **Accuracy:**
+
+    -   $[ \text{Accuracy} = \frac{(TP + TN)}{(TP + TN + FP + FN)} ] [ \text{Accuracy} = \frac{2013 + 518}{2013 + 518 + 26 + 0} = \frac{2531}{2539} \approx 0.997 ]$
+
+        -   *This means the model [correctly classified about 99.7%]{.underline} of the instances.*
+
+-   **Precision:**
+
+    -   $[ \text{Precision} = \frac{TP}{(TP + FP)} ] [ \text{Precision} = \frac{518}{518 + 26} \approx 0.952 ]$
+
+        -   This means that 95.2% of the instances predicted as TRUE were actually TRUE.
+
+-   **Recall (Sensitivity or True Positive Rate):**
+
+    -   $[ \text{Recall} = \frac{TP}{(TP + FN)} ] [ \text{Recall} = \frac{518}{518 + 0} = 1.0 ]$
+
+        -   This means the model [*identified all of the true positive cases correctly*]{.underline}.
+
+-   **Specificity (True Negative Rate):**
+
+    -   $[ \text{Specificity} = \frac{TN}{(TN + FP)} ] [ \text{Specificity} = \frac{2013}{2013 + 26} \approx 0.987 ]$
+
+        -   This means that [*98.7% of the instances predicted as FALSE were actually FALSE*]{.underline}
+
+-   **F1 Score:**
+
+    -   $[ \text{F1 Score} = 2 \times \frac{\text{Precision} \times \text{Recall}}{\text{Precision} + \text{Recall}} ] [ \text{F1 Score} = 2 \times \frac{0.952 \times 1.0}{0.952 + 1.0} \approx 0.976 ]$
+
+        -   This is the harmonic mean of precision and recall, providing a balance between the two.
+
+#### Summary
+
+**Accuracy (0.997):**
+
+-   The model performs very well in general classification.
+
+**Precision (0.952):**
+
+-   The model is very precise when it predicts TRUE.
+
+**Recall (1.0):**
+
+-   The model perfectly captures all actual TRUE instances.
+
+**Specificity (0.987):**
+
+-   The model is highly effective at identifying FALSE instances.
+
+**F1 Score (0.976):**
+
+-   The model maintains a strong balance between precision and recall.
+
+Overall, these metrics suggest that our model performs exceptionally well, with high accuracy, precision, recall, and specificity.

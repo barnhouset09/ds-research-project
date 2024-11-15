@@ -187,37 +187,70 @@ This way we don't have to run the experiment again to find and use our model.
 
 #!csharp
 
-mlContext.Model.Save(experimentResults.Model, loader, PathToTrainedModelFile);
+//mlContext.Model.Save(experimentResults.Model, loader, PathToTrainedModelFile);
 
 #!markdown
 
 ## Test Our Model
+Load the model we saved and perform some predictions on our test data to see how accurate the model is.
 
 #!csharp
 
+// Create the ML Context for testing purposes.
 MLContext mlContextForTesting = new MLContext();
 
-// Load the trained model
 DataViewSchema predictionPipelineSchema;
 
+// Load the trained model
 ITransformer predictionPipeline = mlContextForTesting.Model.Load(PathToTrainedModelFile, out predictionPipelineSchema);
 
 #!csharp
 
+// Apply schema validation on the test data set.
 IDataView predictions = predictionPipeline.Transform(trainValidationData.TestSet);
+
+#!markdown
+
+The below codeblock creates an estimator for a binary classification model using the Stochastic Dual Coordinate Ascent algorithm (SDCA). 
+
+Estimators are used in ML.NET to describe how the model should be trained. 
+
+In this case, this is a binary classification model (used when there are exactly two classes to predict), with the "HasSmell" column used as the label (aka what we want to predict).
+
+#!csharp
+
+var sdcaEstimator = mlContext.BinaryClassification.Trainers.SdcaLogisticRegression(labelColumnName: "HasSmell");
+
+#!markdown
+
+The below codeblock is performing a cross-validation of the binary classification model. 
+
+Cross-validation is a procedure used to avoid overfitting (a modeling error that occurs when a function is too closely fit to a limited set of data points) and give an indication of how well your model will perform on unseen data.
+
+It works by splitting your data into a defined number (5 in this case, known as 'folds') of different 'folds' or 'batches'. It then trains your model multiple times on different combinations of these folds and then averages the result. 
+
+Each iteration of training uses a different fold for testing and the remaining folds for training.
+
+#!csharp
+
+var crossValidationResults = mlContextForTesting.BinaryClassification.CrossValidate(predictions, sdcaEstimator, numberOfFolds: 5, labelColumnName: "HasSmell");
+
+#!markdown
+
+#### Display the test results
+First just to see what the `sdcaEstimator` looks like.
+
+It contains the configuration for the estimator used for assessing the accuracy of the results of the cross validation.
 
 #!csharp
 
 sdcaEstimator.Display()
 
-#!csharp
+#!markdown
 
-// Define your pipeline
-var pipeline = mlContextForTesting.Append(mlContext.Regression.Trainers.Sdca(labelColumnName: "HasSmell"));
+Next, we see the results of each fold/batch of our cross validation.
 
-var crossValidationResults = 
-    mlContext.BinaryClassification
-        .CrossValidate(predictions, pipeline, numberOfFolds: 10, labelColumnName: "HasSmell");
+Each batch includes a Metrics collection that tells us various attributes about how the model performed on the test data.
 
 #!csharp
 
